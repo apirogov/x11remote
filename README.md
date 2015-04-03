@@ -31,6 +31,8 @@ The server is written in Haskell, so to build an compile just clone this reposit
 install`. Run `x11remote -p PORT` to run x11remote on a custom port. On your touch device just open
 the website at `http://<IP-Address of host>:<selected port>`.
 
+**Arch Linux users:** You can install x11remote from AUR!
+
 ## Known bugs
 * Sometimes a key or mouse button stays pressed, even if you lift your finger. After a lot of
   experimentation I concluded that this is a bug in the EaselJS library.
