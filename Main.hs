@@ -14,14 +14,14 @@ import Data.Text.Lazy (fromStrict)
 
 import System.Process
 import System.Exit
-import System.IO (hPutStrLn,stderr)
+import System.IO (hPutStrLn, stderr)
 import System.IO.Error (catchIOError, isDoesNotExistError)
 
 import Options.Applicative
 import Data.FileEmbed
 import Web.Scotty
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
-import Network.Wai.Middleware.Static        (addBase, noDots, staticPolicy, (>->))
+import Network.Wai.Middleware.Static (addBase, noDots, staticPolicy, (>->))
 
 data Args = Args { argPort :: Int, argVerbose :: Bool, argDebug :: Bool }
 
@@ -57,10 +57,10 @@ myScottyApp args = do
     middleware $ staticPolicy (noDots >-> addBase "static") -- for pics, JS stuff
   else do --serve additional files from embedded data in binary (-> no deps)
     get "/" $ serveStatic "index.html"
-    mapM_ (\s -> get (fromString $ "/"++s) $ serveStatic s) $ map fst embeddedStatic
+    mapM_ ((\s -> get (fromString $ "/"++s) $ serveStatic s) . fst) embeddedStatic
 
-  -- return xmodmap keymap
-  get "/getkeymap" $ getXModmap >>= json
+  -- return xmodmap keymap (get always fresh)
+  get "/keymap.json" $ getXModmap >>= json
 
   -- xdotool API
   get "/key/:str" $ xkeycmd "key" "str"
@@ -95,7 +95,7 @@ xdotool args = do
 
 -- get the current xmodmap settings as map of (keycode,[different keysyms])
 getXModmap = parseKeymap <$> liftIO (readProcess "xmodmap" ["-pke"] "")
-  where parseKeymap = M.fromList . mapMaybe toEntry . map words . lines
+  where parseKeymap = M.fromList . mapMaybe (toEntry . words) . lines
         toEntry s = if length l/=2 || length r<1 then Nothing
                     else Just (last l, tail r)
           where (l,r) = break (=="=") s
