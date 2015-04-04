@@ -33,6 +33,3 @@ the website at `http://<IP-Address of host>:<selected port>`.
 
 **Arch Linux users:** You can install x11remote from AUR!
 
-## Known bugs
-* Sometimes a key or mouse button stays pressed, even if you lift your finger. After a lot of
-  experimentation I concluded that this is a bug in the EaselJS library.
