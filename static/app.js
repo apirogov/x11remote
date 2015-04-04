@@ -1,8 +1,24 @@
+// synchronized GET, returns as JSON
 function getjson(url){
   var x = new XMLHttpRequest();
   x.open("GET",url,false); x.send();
   return JSON.parse(x.responseText);
 }
+
+// parallel "thread" pushing out commands in order without blocking UI
+var reqqueue = [];
+function pushAjax() {
+  var xmlhttp = new XMLHttpRequest();
+  while (reqqueue.length>0) {
+    var url = reqqueue.shift();
+    xmlhttp.open("GET",url,false);
+    xmlhttp.send();
+  }
+  setTimeout(pushAjax, 10);
+}
+setTimeout(pushAjax, 10);
+
+// ----------------------------------------------------------------------------
 
 //load keymap for keyboard once from server on startup
 var keymap = getjson('keymap.json');
@@ -32,11 +48,7 @@ var sy=null;
 
 function isdef(x){ return (typeof x != 'undefined') }
 
-function xdo(url) {
-  var xmlhttp = new XMLHttpRequest();
-  xmlhttp.open("GET",url,false);
-  xmlhttp.send();
-}
+function xdo(url) { reqqueue.push(url); }
 
 function newRect(x,y,w,h,borderclr,fillclr) {
   var r = new createjs.Shape();
@@ -258,7 +270,6 @@ function resizeCanvas() {
 }
 
 function initialize() {
-  //createjs.Touch.enable(st); //enable touch device support
   document.body.addEventListener('touchmove', //prevent scrolling
       function(event) { event.preventDefault(); }, false);
 
@@ -266,6 +277,7 @@ function initialize() {
   // each time the window is resized.
   window.addEventListener('resize', resizeCanvas, false);
 
+  //custom touch event handling because official loses events
   window.addEventListener('touchstart',function(evt){handleTouch('touchstart',evt)},false);
   window.addEventListener('touchmove',function(evt){handleTouch('touchmove',evt)},false);
   window.addEventListener('touchend',function(evt){handleTouch('touchend',evt)},false);
