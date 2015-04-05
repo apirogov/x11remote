@@ -6,12 +6,12 @@ import Data.List (isSuffixOf)
 import Data.List.Split (splitOn)
 import Control.Applicative
 import Control.Monad
-import Control.Monad.Trans (liftIO)
+import Control.Monad.Trans (liftIO,MonadIO)
 
 import Data.String (fromString)
 import qualified Data.ByteString as BS
 import Data.Text.Encoding (decodeUtf8)
-import Data.Text.Lazy (fromStrict)
+import Data.Text.Lazy (Text, fromStrict, unpack)
 
 import System.Process
 import System.Exit
@@ -21,6 +21,9 @@ import System.IO.Error (catchIOError, isDoesNotExistError)
 import Options.Applicative
 import Data.FileEmbed
 import Web.Scotty
+import Network.WebSockets
+import Network.Wai.Handler.Warp (run)
+import Network.Wai.Handler.WebSockets (websocketsOr)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.Static (addBase, noDots, staticPolicy, (>->))
 
@@ -37,7 +40,9 @@ main = do
   args <- execParser $ info (helper <*> parseArgs) fullDesc
   missingToolExit "xdotool"
   missingToolExit "xmodmap"
-  scotty (argPort args) $ myScottyApp args
+  httpApp <- scottyApp $ myScottyApp args
+  run (argPort args) $ websocketsOr defaultConnectionOptions (wsApp $ argVerbose args)
+                                    httpApp
 
 -- check that a program with given name exists/can be called
 toolExists str = (createProcess (proc str [])
@@ -49,6 +54,18 @@ missingToolExit str = toolExists str >>= \exists ->
   unless exists $ do
     hPutStrLn stderr $ str++" not found! Please add a "++str++" binary to your PATH!"
     exitFailure
+
+-- websocket server listening for xdotool commands (similar to GET API)
+wsApp :: Bool -> ServerApp
+wsApp verbose pending = do
+    connection <- acceptRequest pending
+    when verbose $ putStrLn "Websocket connection accepted"
+    forkPingThread connection 30
+    forever $ do
+        message <- unpack <$> receiveData connection
+        when verbose $ putStrLn $ "Received: "++message
+        mapM_ (xdotool . words) $ splitOn "|" message
+        sendTextData connection $ decodeUtf8 $ fromString "ACK"
 
 myScottyApp args = do
   when (argVerbose args) $ middleware logStdoutDev
@@ -63,50 +80,20 @@ myScottyApp args = do
   -- return xmodmap keymap (get always fresh)
   get "/keymap.json" $ getXModmap >>= json
 
-  -- xdotool API
-  get "/key/:str" $ xkeycmd "key" "str"
-  get "/keydown/:str" $ xkeycmd "keydown" "str"
-  get "/keyup/:str" $ xkeycmd "keyup" "str"
+  -- receive xdotool commands, one or many, seperated by |
+  get "/exec/:cmds" $ do
+    tmp <- param "cmds"
+    let cmds = map words $ splitOn "|" tmp
+    mapM_ xdotool cmds
+    text "ACK"
 
-  get "/mousemove/:x/:y" $ xmovecmd "mousemove" "x" "y" False
-  get "/mousemove_relative/:x/:y" $ xmovecmd "mousemove_relative" "x" "y" True
-
-  get "/click/:btn" $ xbtncmd "click" "btn"
-  get "/mousedown/:btn" $ xbtncmd "mousedown" "btn"
-  get "/mouseup/:btn" $ xbtncmd "mouseup" "btn"
-
-  get "/chain/:cmds" $ param "cmds" >>= runXdoChain >> text (fromString "")
-
-embeddedStatic :: [(FilePath, BS.ByteString)]
-embeddedStatic = $(embedDir "static")
-serveStatic str
- | "html" `isSuffixOf` str = html txt
- | otherwise = text txt
- where txt = fromStrict $ decodeUtf8 $ fromMaybe BS.empty $ lookup str embeddedStatic
-
--- helper actions: execute xdotool with given arguments, render result
-xkeycmd cmd keyp = param keyp >>= \k -> xdotool [cmd,k]
-xbtncmd cmd btnp = param btnp >>= \b -> xdotool [cmd,show $ b+(0::Int)]
-xmovecmd cmd xp yp rel = do
-  x <- show . (+(0::Int)) <$>  param xp
-  y <- show . (+(0::Int)) <$> param yp
-  xdotool $ if rel then [cmd,"--",x,y] else [cmd,x,y]
-
--- evaluate chain of form command p1 p2|command p1|...
-runXdoChain :: String -> ActionM ()
-runXdoChain str = mapM_ runAccording cmds
- where cmds = map words $ splitOn "|" str
-
-runAccording :: [String] -> ActionM ()
-runAccording cmd
- | head cmd `elem` ["key","keydown","keyup",
-                    "click","mousedown","mouseup","mousemove"] = xdotool cmd
- | head cmd == "mousemove_relative" = xdotool (head cmd:"--":tail cmd)
- | otherwise = text $ fromString $ head cmd ++ ": unrecognized command!"
-
+xdotool :: (MonadIO m) => [String] -> m Text
 xdotool args = do
- ret <- liftIO (readProcess "xdotool" args "")
- text $ fromString ret
+ let args' = if head args == "mousemove_relative"
+             then head args:"--":tail args
+             else args
+ ret <- liftIO $ readProcess "xdotool" args' "" `catchIOError` (\e -> return $ show e)
+ return $ fromString ret
 
 -- get the current xmodmap settings as map of (keycode,[different keysyms])
 getXModmap = parseKeymap <$> liftIO (readProcess "xmodmap" ["-pke"] "")
@@ -114,4 +101,11 @@ getXModmap = parseKeymap <$> liftIO (readProcess "xmodmap" ["-pke"] "")
         toEntry s = if length l/=2 || length r<1 then Nothing
                     else Just (last l, tail r)
           where (l,r) = break (=="=") s
+
+embeddedStatic :: [(FilePath, BS.ByteString)]
+embeddedStatic = $(embedDir "static")
+serveStatic str
+ | "html" `isSuffixOf` str = html txt
+ | otherwise = text txt
+ where txt = fromStrict $ decodeUtf8 $ fromMaybe BS.empty $ lookup str embeddedStatic
 

@@ -7,26 +7,36 @@ function getjson(url){
 
 // parallel "thread" pushing out commands in order without blocking UI
 var reqqueue = [];
+var sock = new WebSocket(location.origin.replace('http','ws'));
 function pushAjax() {
   if (reqqueue.length==0) {
     setTimeout(pushAjax,25);
     return;
   } else {
-    cmds = "/chain/";
+
+    var cmds = "";
     while (reqqueue.length>0) {
-      var url = reqqueue.shift();
-      var cmd = url.replace(/\//g, ' ');
-      cmds += cmd + '|'
+      cmds += reqqueue.shift() + '|'
     }
     cmds = cmds.substr(0,cmds.length-1);
 
+    if (isdef(sock) && sock != null) { //use websockets
 
-    var xmlhttp = new XMLHttpRequest();
-    xmlhttp.open("GET",cmds,true);
-    xmlhttp.onreadystatechange = function(){
-      if (xmlhttp.readyState==4) pushAjax();
-    };
-    xmlhttp.send();
+      sock.send(cmds);
+      pushAjax();
+
+    } else {
+
+      cmds = "/exec/"+cmds;
+
+      var xmlhttp = new XMLHttpRequest(); //use http GET
+      xmlhttp.open("GET",cmds,true);
+      xmlhttp.onreadystatechange = function(){
+        if (xmlhttp.readyState==4) pushAjax();
+      };
+      xmlhttp.send();
+
+    }
   }
 }
 pushAjax();
@@ -93,18 +103,18 @@ function generateMouse(x,y,w,h) {
   var mbtn = newRect(w/5*2,th,w/5,h-th,"black","#808080");
   var rbtn = newRect(w/5*3,th,w/5*2,h-th,"black","#b0b0b0");
 
+  tpad.touchstart = function(evt){
+    ox = sx = evt.clientX;
+    oy = sy = evt.clientY;
+  }
   tpad.touchmove = function(evt){
-    if (ox==null) {
-      ox = sx = evt.clientX;
-      oy = sy = evt.clientY;
-    }
     var nx=evt.clientX;
     var ny=evt.clientY;
     var sc=2; //scale factor (movement speed)
     if (Math.abs(nx-ox)>1 || Math.abs(ny-oy)>1) {
       var dx = Math.round(nx-ox)*sc;
       var dy = Math.round(ny-oy)*sc;
-      xdo("mousemove_relative/"+dx+"/"+dy);
+      xdo("mousemove_relative "+dx+" "+dy);
     }
     ox = nx;
     oy = ny;
@@ -113,16 +123,16 @@ function generateMouse(x,y,w,h) {
     var x = evt.clientX;
     var y = evt.clientY;
     if (Math.abs(sx-x)<3 && Math.abs(sy-y)<3)
-      xdo("click/1")
+      xdo("click 1")
     sx=sy=ox=oy=null;
   };
 
-  lbtn.touchstart = function(){xdo("mousedown/1")}
-  lbtn.touchend = function(){xdo("mouseup/1")}
-  mbtn.touchstart = function(){xdo("mousedown/2")}
-  mbtn.touchend = function(){xdo("mouseup/2")}
-  rbtn.touchstart = function(){xdo("mousedown/3")}
-  rbtn.touchend = function(){xdo("mouseup/3")}
+  lbtn.touchstart = function(){xdo("mousedown 1")}
+  lbtn.touchend = function(){xdo("mouseup 1")}
+  mbtn.touchstart = function(){xdo("mousedown 2")}
+  mbtn.touchend = function(){xdo("mouseup 2")}
+  rbtn.touchstart = function(){xdo("mousedown 3")}
+  rbtn.touchend = function(){xdo("mouseup 3")}
 
   st.addChild(tpad);
   st.addChild(lbtn);
@@ -193,7 +203,7 @@ function generateKeyboard(x,y,w,h) {
 }
 
 function keyDown(ksym) {
-  xdo("keydown/"+ksym);
+  xdo("keydown "+ksym);
 
   if (ksym=='Shift_L' || ksym=='Shift_R') {
     shiftPressed=true; updateKeyLabels();
@@ -209,7 +219,7 @@ function keyDown(ksym) {
 }
 
 function keyUp(ksym){
-  xdo("keyup/"+ksym);
+  xdo("keyup "+ksym);
 
   if (ksym=='Shift_L' || ksym=='Shift_R') {
     shiftPressed=false; updateKeyLabels();

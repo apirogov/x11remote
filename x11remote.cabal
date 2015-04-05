@@ -20,9 +20,12 @@ executable x11remote
   -- other-extensions:
   build-depends:       base >=4.7 && <4.8
                      , scotty >=0.9
+                     , wai-middleware-static >=0.6
+                     , websockets >=0.9
                      , wai >=3.0
                      , wai-extra >=3.0
-                     , wai-middleware-static >=0.6
+                     , wai-websockets >=3.0
+                     , warp >=3.0
                      , file-embed >=0.0.8
                      , optparse-applicative >=0.10
                      , text >=1.2
