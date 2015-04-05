@@ -27,22 +27,27 @@ import Network.Wai.Handler.WebSockets (websocketsOr)
 import Network.Wai.Middleware.RequestLogger (logStdoutDev)
 import Network.Wai.Middleware.Static (addBase, noDots, staticPolicy, (>->))
 
-data Args = Args { argPort :: Int, argVerbose :: Bool, argDebug :: Bool }
+data Args = Args { argPort :: Int, argVerbose :: Bool
+                 , argWebsockets :: Bool, argDebug :: Bool }
 
 parseArgs :: Parser Args
 parseArgs = Args
         <$> option auto (long "port" <> short 'p' <> metavar "PORT"
          <> help "Port for X11Remote to listen on" <> value 1234 <> showDefault)
         <*> switch (long "verbose" <> short 'v' <> help "Enable verbose server log")
+        <*> switch (long "websockets" <> short 'w' <> help "Enable websocket support")
         <*> switch (long "debug" <> short 'd' <> help "Debug mode (serve files from ./static/)")
 
 main = do
   args <- execParser $ info (helper <*> parseArgs) fullDesc
   missingToolExit "xdotool"
   missingToolExit "xmodmap"
-  httpApp <- scottyApp $ myScottyApp args
-  run (argPort args) $ websocketsOr defaultConnectionOptions (wsApp $ argVerbose args)
-                                    httpApp
+  if argWebsockets args then do
+    httpApp <- scottyApp $ myScottyApp args
+    run (argPort args) $ websocketsOr
+                           defaultConnectionOptions (wsApp $ argVerbose args)
+                           httpApp
+  else scotty (argPort args) $ myScottyApp args
 
 -- check that a program with given name exists/can be called
 toolExists str = (createProcess (proc str [])

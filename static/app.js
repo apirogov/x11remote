@@ -7,10 +7,21 @@ function getjson(url){
 
 // parallel "thread" pushing out commands in order without blocking UI
 var reqqueue = [];
-var sock = new WebSocket(location.origin.replace('http','ws'));
-function pushAjax() {
+
+//try websockets
+var sock = null;
+if (window.WebSocket)
+  sock = new WebSocket(location.origin.replace('http','ws'));
+if (sock != null) { //if something happens, fall back to Ajax
+  sock.onerror = function(){ sock = null; }
+  sock.onclose = function(){ sock = null; }
+  if (sock.readyState>1)
+    sock = null;
+}
+
+function pushCommands() {
   if (reqqueue.length==0) {
-    setTimeout(pushAjax,25);
+    setTimeout(pushCommands,25);
     return;
   } else {
 
@@ -20,10 +31,10 @@ function pushAjax() {
     }
     cmds = cmds.substr(0,cmds.length-1);
 
-    if (isdef(sock) && sock != null) { //use websockets
+    if (sock != null) { //use websockets
 
       sock.send(cmds);
-      pushAjax();
+      pushCommands();
 
     } else {
 
@@ -32,14 +43,14 @@ function pushAjax() {
       var xmlhttp = new XMLHttpRequest(); //use http GET
       xmlhttp.open("GET",cmds,true);
       xmlhttp.onreadystatechange = function(){
-        if (xmlhttp.readyState==4) pushAjax();
+        if (xmlhttp.readyState==4) pushCommands();
       };
       xmlhttp.send();
 
     }
   }
 }
-pushAjax();
+pushCommands();
 
 // ----------------------------------------------------------------------------
 
