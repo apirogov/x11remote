@@ -30,6 +30,7 @@ executable x11remote
                      , containers
                      , process
                      , mtl
+                     , split
 
   default-language:    Haskell2010
   ghc-options:         -Wall -fno-warn-unused-do-bind -fno-warn-missing-signatures -fno-warn-name-shadowing -fno-warn-orphans

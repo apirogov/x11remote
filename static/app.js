@@ -8,15 +8,28 @@ function getjson(url){
 // parallel "thread" pushing out commands in order without blocking UI
 var reqqueue = [];
 function pushAjax() {
-  var xmlhttp = new XMLHttpRequest();
-  while (reqqueue.length>0) {
-    var url = reqqueue.shift();
-    xmlhttp.open("GET",url,false);
+  if (reqqueue.length==0) {
+    setTimeout(pushAjax,25);
+    return;
+  } else {
+    cmds = "/chain/";
+    while (reqqueue.length>0) {
+      var url = reqqueue.shift();
+      var cmd = url.replace(/\//g, ' ');
+      cmds += cmd + '|'
+    }
+    cmds = cmds.substr(0,cmds.length-1);
+
+
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.open("GET",cmds,true);
+    xmlhttp.onreadystatechange = function(){
+      if (xmlhttp.readyState==4) pushAjax();
+    };
     xmlhttp.send();
   }
-  setTimeout(pushAjax, 10);
 }
-setTimeout(pushAjax, 10);
+pushAjax();
 
 // ----------------------------------------------------------------------------
 
@@ -186,6 +199,8 @@ function keyDown(ksym) {
     shiftPressed=true; updateKeyLabels();
   } else if (ksym=='ISO_Level3_Shift') {
     l3shiftPressed=true; updateKeyLabels();
+  } else if (ksym=='ISO_Level5_Shift') {
+    l5shiftPressed=true; updateKeyLabels();
   }
 
   if (ksym=='Caps_Lock') {
@@ -200,6 +215,8 @@ function keyUp(ksym){
     shiftPressed=false; updateKeyLabels();
   } else if (ksym=='ISO_Level3_Shift') {
     l3shiftPressed=false; updateKeyLabels();
+  } else if (ksym=='ISO_Level5_Shift') {
+    l5shiftPressed=false; updateKeyLabels();
   }
 }
 
@@ -215,6 +232,10 @@ function updateKeyLabels() {
     idx = 4;
   else if (shiftPressed && l3shiftPressed && !l5shiftPressed)
     idx = 5;
+  else if (!shiftPressed && !l3shiftPressed && l5shiftPressed)
+    idx = 6;
+  else if (shiftPressed && !l3shiftPressed && l5shiftPressed)
+    idx = 7;
 
   for (var j=0; j<layout.length; j++) {
     for (var i=0; i<layout[j].length; i++) {

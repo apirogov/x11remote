@@ -3,6 +3,7 @@ import Data.Monoid
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe,fromMaybe)
 import Data.List (isSuffixOf)
+import Data.List.Split (splitOn)
 import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans (liftIO)
@@ -74,6 +75,8 @@ myScottyApp args = do
   get "/mousedown/:btn" $ xbtncmd "mousedown" "btn"
   get "/mouseup/:btn" $ xbtncmd "mouseup" "btn"
 
+  get "/chain/:cmds" $ param "cmds" >>= runXdoChain >> text (fromString "")
+
 embeddedStatic :: [(FilePath, BS.ByteString)]
 embeddedStatic = $(embedDir "static")
 serveStatic str
@@ -88,6 +91,18 @@ xmovecmd cmd xp yp rel = do
   x <- show . (+(0::Int)) <$>  param xp
   y <- show . (+(0::Int)) <$> param yp
   xdotool $ if rel then [cmd,"--",x,y] else [cmd,x,y]
+
+-- evaluate chain of form command p1 p2|command p1|...
+runXdoChain :: String -> ActionM ()
+runXdoChain str = mapM_ runAccording cmds
+ where cmds = map words $ splitOn "|" str
+
+runAccording :: [String] -> ActionM ()
+runAccording cmd
+ | head cmd `elem` ["key","keydown","keyup",
+                    "click","mousedown","mouseup","mousemove"] = xdotool cmd
+ | head cmd == "mousemove_relative" = xdotool (head cmd:"--":tail cmd)
+ | otherwise = text $ fromString $ head cmd ++ ": unrecognized command!"
 
 xdotool args = do
  ret <- liftIO (readProcess "xdotool" args "")
