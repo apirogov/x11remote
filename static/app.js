@@ -93,11 +93,11 @@ function generateMouse(x,y,w,h) {
   var mbtn = newRect(w/5*2,th,w/5,h-th,"black","#808080");
   var rbtn = newRect(w/5*3,th,w/5*2,h-th,"black","#b0b0b0");
 
-  tpad.touchstart = function(evt){
-    ox = sx = evt.clientX;
-    oy = sy = evt.clientY;
-  };
   tpad.touchmove = function(evt){
+    if (ox==null) {
+      ox = sx = evt.clientX;
+      oy = sy = evt.clientY;
+    }
     var nx=evt.clientX;
     var ny=evt.clientY;
     var sc=2; //scale factor (movement speed)
@@ -317,16 +317,18 @@ function getShapeOwningTouch(touch) {
       break;
     }
   }
-  if (shape==null) {
-    for (var j=0; isdef(st.getChildAt(j)); j++) {
-      var curr = st.getChildAt(j);
-      var a = curr.getBounds();
-      var x = touch.clientX;
-      var y = touch.clientY;
-      if (x>=a.x && x<=(a.x+a.width) && y>=a.y && y<=(a.y+a.height)) {
-        shape = curr;
-        break;
-      }
+  return shape;
+}
+function getShapeBoundingTouch(touch) {
+  var shape = null;
+  for (var j=0; isdef(st.getChildAt(j)); j++) {
+    var curr = st.getChildAt(j);
+    var a = curr.getBounds();
+    var x = touch.clientX;
+    var y = touch.clientY;
+    if (x>=a.x && x<=(a.x+a.width) && y>=a.y && y<=(a.y+a.height)) {
+      shape = curr;
+      break;
     }
   }
   return shape;
@@ -339,20 +341,25 @@ function handleTouch(name, evt) {
 
   for (var i=0; i<ts.length; i++) {
     var t = ts[i];
-    var child = getShapeOwningTouch(t);
+    var victim = getShapeBoundingTouch(t);
+    var owner = getShapeOwningTouch(t);
+    //if we have no owning shape, use the effective shape below touch
+    if (owner==null)
+      owner = victim;
 
     if (name == 'touchstart') {
-      if (!isdef(child.touches))
-        child.touches = {};
-      child.touches[t.identifier] = true;
-
-      child.touchstart(t);
-
+      if (!isdef(owner.touches))
+        owner.touches = {};
+      owner.touches[t.identifier] = true;
+      if (isdef(victim.touchstart))
+        owner.touchstart(t);
     } else if (name == 'touchmove') {
-        child.touchmove(t);
+      if (isdef(victim.touchmove))
+        owner.touchmove(t);
     } else if (name == 'touchend') {
-        child.touchend(t);
-        child.touches[t.identifier] = false;
+      if (isdef(victim.touchend))
+        owner.touchend(t);
+      owner.touches[t.identifier] = false;
     }
 
   }
