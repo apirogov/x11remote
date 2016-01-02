@@ -18,7 +18,7 @@ cabal-version:       >=1.10
 executable x11remote
   main-is:             Main.hs
   -- other-extensions:
-  build-depends:       base >=4.7 && <4.8
+  build-depends:       base >=4.7 && <5.0
                      , scotty >=0.9
                      , wai-middleware-static >=0.6
                      , websockets >=0.9
