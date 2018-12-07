@@ -1,10 +1,10 @@
 module Main where
-import Data.Monoid
+-- import Data.Monoid
 import qualified Data.Map as M
 import Data.Maybe (mapMaybe,fromMaybe)
 import Data.List (isSuffixOf)
 import Data.List.Split (splitOn)
-import Control.Applicative
+-- import Control.Applicative
 import Control.Monad
 import Control.Monad.Trans (liftIO,MonadIO)
 
