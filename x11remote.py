@@ -9,8 +9,8 @@ from flask_sockets import Sockets
 
 def get_parser():
     parser = OptionParser(usage='%prog [-p|--port PORT] [-w|--websockets]')
-    parser.add_option('-p', '--port',
-            help='Port for X11Remote to listen on (default: %default)')
+    parser.add_option('-p', '--port', type=int,
+                  help='Port for X11Remote to listen on (default: %default)')
     parser.add_option('-w', '--websockets', action='store_true',
             help='Enable websocket support')
     parser.set_defaults(port=1234)
